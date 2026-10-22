@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>主 OAuth 账号管理</title>
+  <link rel="stylesheet" href="./styles.css?v=20260920-quota-multiselect">
+</head>
+<body>
+  <section id="bootView" class="boot-shell" aria-label="正在检查登录状态">
+    <div class="boot-indicator" aria-hidden="true">
+      <span class="brand-mark">OA</span>
+      <span class="boot-progress"><span></span></span>
+    </div>
+  </section>
+
+  <section id="loginView" class="login-shell hidden">
+    <form id="loginForm" class="login-panel" autocomplete="on">
+      <div class="brand-block">
+        <span class="brand-mark">OA</span>
+        <div>
+          <h1>主 OAuth 账号管理</h1>
+        </div>
+      </div>
+      <label>
+        <span>用户名</span>
+        <input id="loginUsername" name="username" autocomplete="username" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button id="loginButton" class="primary wide" type="submit">登录</button>
+      <div id="loginError" class="form-error" role="alert"></div>
+    </form>
+  </section>
+
+  <div id="appView" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-head">
+        <span class="brand-mark small">OA</span>
+        <strong class="sidebar-title">主 OAuth</strong>
+        <button id="collapseSidebar" class="icon-button" type="button" aria-label="折叠菜单" title="折叠菜单">
+          <span class="desktop-collapse-symbol" aria-hidden="true">‹</span>
+          <span class="mobile-close-symbol" aria-hidden="true">×</span>
+        </button>
+      </div>
+      <nav class="nav-list" aria-label="主菜单">
+        <button class="nav-item active" data-view="accounts" type="button"><span class="nav-symbol">▦</span><span>首页</span></button>
+        <button class="nav-item" data-view="archive" type="button"><span class="nav-symbol">▤</span><span>死亡账号</span></button>
+        <button class="nav-item" data-view="add" type="button"><span class="nav-symbol">＋</span><span>上号</span></button>
+        <button id="claudeSkNav" class="nav-item admin-only" data-view="claude-sk" type="button"><span class="nav-symbol">⌁</span><span>Claude SK</span></button>
+        <button id="usersNav" class="nav-item admin-only" data-view="users" type="button"><span class="nav-symbol">◎</span><span>用户</span></button>
+        <button id="serversNav" class="nav-item admin-only" data-view="servers" type="button"><span class="nav-symbol">▣</span><span>服务器</span></button>
+        <button class="nav-item" data-view="stats" type="button"><span class="nav-symbol">▥</span><span>每日统计</span></button>
+        <button id="requestQualityNav" class="nav-item admin-only" data-view="request-quality" type="button"><span class="nav-symbol" aria-hidden="true">≋</span><span>请求质量</span></button>
+        <button class="nav-item admin-only" data-view="request-ips" type="button"><span class="nav-symbol" aria-hidden="true">◎</span><span>请求 IP</span></button>
+        <button class="nav-item" data-view="auth-stats" type="button"><span class="nav-symbol">%</span><span>授权统计</span></button>
+        <button class="nav-item" data-view="account-errors" type="button"><span class="nav-symbol" aria-hidden="true">!</span><span>上号错误统计</span></button>
+      </nav>
+      <div class="sidebar-user">
+        <div class="avatar" id="sidebarAvatar">M</div>
+        <div class="sidebar-user-copy">
+          <strong id="sidebarUsername">-</strong>
+          <span id="sidebarRole">-</span>
+        </div>
+        <button id="logoutButton" class="icon-button" type="button" aria-label="退出登录" title="退出登录">↪</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button id="mobileMenu" class="icon-button mobile-menu" type="button" aria-label="打开菜单">☰</button>
+        <div>
+          <h2 id="pageTitle">首页</h2>
+          <p id="pageMeta">全部当前账号</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="topDeficit" class="quota-pill" type="button"></button>
+          <button id="globalRefresh" class="secondary" type="button">刷新</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section id="view-accounts" class="view active">
+          <div id="homeTabs" class="home-tabs" role="tablist" aria-label="首页视图">
+            <button id="homeAccountsTab" type="button" role="tab" aria-selected="true" aria-controls="accountListPanel" data-home-tab="accounts">账号列表</button>
+            <button id="homeWeeklyTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPanel" tabindex="-1" data-home-tab="weekly">限额刷新</button>
+          </div>
+          <div id="accountListPanel" role="tabpanel" aria-labelledby="homeAccountsTab">
+          <div id="homeAccountControls">
+            <div class="metrics-grid">
+              <article class="metric metric-money cost-visible"><span>日期范围计费</span><strong id="metricCost">$0.00</strong></article>
+              <article class="metric"><span>日期范围请求</span><strong id="metricRequests">0</strong></article>
+              <article class="metric metric-good"><span>今日上号</span><strong id="metricTodayAdditions">0</strong></article>
+              <article class="metric metric-quota"><span>当前站点可补</span><strong id="metricAvailable">0</strong></article>
+              <article id="metricUnlimitedCard" class="metric metric-good hidden"><span>当前无限额账号</span><strong id="metricUnlimited">0</strong></article>
+            </div>
+
+            <section id="realtimeMetrics" class="realtime-metrics hidden" aria-live="polite">
+              <div class="realtime-metrics-head">
+                <div><h3 id="realtimeMetricsTitle">实时汇总</h3><span>RPM / TPM 近 60 秒 · 并发为瞬时快照</span></div>
+                <span id="realtimeMetricsStatus" class="realtime-status">正在读取</span>
+              </div>
+              <div class="realtime-metrics-grid">
+                <div><span>RPM</span><strong id="realtimeRpm">-</strong></div>
+                <div><span>TPM</span><strong id="realtimeTpm">-</strong></div>
+                <div><span>并发占用 / 运行中上限</span><strong id="realtimeConcurrency">- / -</strong></div>
+                <div><span>等待队列</span><strong id="realtimeWaiting">-</strong></div>
+              </div>
+              <p id="realtimeScopeNote" class="hidden"></p>
+              <p id="realtimeMetricsMeta">等待容量快照</p>
+              <details id="realtimeSiteDetails" class="realtime-site-details hidden">
+                <summary>按站点查看</summary>
+                <div id="realtimeSiteRows"></div>
+              </details>
+            </section>
+
+            <div class="toolbar account-toolbar">
+              <label class="search-field grow">
+                <span>搜索</span>
+                <input id="accountSearch" type="search" placeholder="邮箱、站点、本地账号 ID、错误信息">
+              </label>
+              <label>
+                <span>开始日期</span>
+                <input id="accountFrom" type="date">
+              </label>
+              <label>
+                <span>结束日期</span>
+                <input id="accountTo" type="date">
+              </label>
+              <label id="ownerFilterWrap" class="admin-only">
+                <span>归属用户</span>
+                <select id="ownerFilter"><option value="">全部用户</option></select>
+              </label>
+              <label id="siteFilterWrap" class="admin-only">
+                <span>账号站点</span>
+                <select id="siteFilter"><option value="">全部站点</option></select>
+              </label>
+              <label>
+                <span>排序</span>
+                <select id="accountSort">
+                  <option id="costSortOption" value="cost_desc">账号总计费</option>
+                  <option value="added_desc">上号时间</option>
+                  <option value="life_desc">存活时间</option>
+                  <option value="status">账号分类</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="categoryFilters" class="segmented-scroll" role="group" aria-label="账号分类"></div>
+            <div class="liveness-tools">
+              <button id="startLivenessButton" class="secondary compact" type="button" disabled>Main 测活并更新用量</button>
+              <button id="startDueLivenessButton" class="secondary compact" type="button" disabled>仅三窗口已重置/待刷新</button>
+              <button id="retryLivenessButton" class="secondary compact hidden" type="button">补测未执行账号</button>
+              <button id="toggleLivenessResultButton" class="link-button compact hidden" type="button" aria-controls="livenessJobPanel" aria-expanded="false">上次结果</button>
+            </div>
+            <div id="livenessJobPanel" class="job-surface hidden" aria-live="polite">
+              <div class="liveness-progress-heading">
+                <strong id="livenessStatus">测活中</strong>
+                <span id="livenessNumbers">0 / 0</span>
+              </div>
+              <progress id="livenessProgress" class="progress-bar" max="100" value="0" aria-label="Main 测活进度"></progress>
+              <div id="livenessSummary"></div>
+              <div id="livenessQueue"></div>
+              <div id="livenessActive" class="hidden"></div>
+            </div>
+          </div>
+
+          <div id="archiveAccountControls" class="archive-controls hidden">
+            <div id="refundFilters" class="segmented-scroll" role="group" aria-label="死亡账号处理状态"></div>
+            <div class="archive-filter-row">
+              <label>
+                <span>搜索死亡账号</span>
+                <input id="archiveSearch" type="search" placeholder="邮箱、站点、本地账号 ID、错误信息">
+              </label>
+              <label id="archiveOwnerFilterWrap" class="admin-only">
+                <span>归属用户</span>
+                <select id="archiveOwnerFilter"><option value="">全部用户</option></select>
+              </label>
+              <label id="archiveSiteFilterWrap" class="admin-only">
+                <span>账号站点</span>
+                <select id="archiveSiteFilter"><option value="">全部站点</option></select>
+              </label>
+              <label>
+                <span>归档日期起</span>
+                <input id="archiveFrom" type="date">
+              </label>
+              <label>
+                <span>归档日期止</span>
+                <input id="archiveTo" type="date">
+              </label>
+              <label>
+                <span>排序</span>
+                <select id="archiveSort">
+                  <option value="deleted_desc">归档时间</option>
+                  <option value="added_desc">上号时间</option>
+                  <option value="life_desc">存活时间</option>
+                  <option value="status">账号状态</option>
+                </select>
+              </label>
+              <div class="archive-filter-actions">
+                <button id="archiveResetFilters" class="secondary compact" type="button">重置筛选</button>
+                <button id="archiveExportButton" class="primary compact" type="button">导出当前结果</button>
+              </div>
+            </div>
+            <div id="bulkDeleteTools" class="bulk-delete-tools hidden">
+              <span id="deleteAllErrorsCount">可删除错误账号 0 个</span>
+              <button id="deleteAllErrorsButton" class="danger compact" type="button" disabled>一键删除错误账号</button>
+            </div>
+            <div id="refundTransitionTools" class="bulk-delete-tools hidden admin-only">
+              <span id="refundTransitionCount">可批量处理 0 个</span>
+              <button id="transitionRefundsButton" class="secondary compact" type="button" disabled></button>
+            </div>
+            <div id="refundedPurgeTools" class="bulk-delete-tools hidden admin-only">
+              <span id="refundedPurgeCount">已成功退款 0 个</span>
+              <button id="purgeRefundedButton" class="danger compact" type="button" disabled>一键归档已成功退款账号</button>
+            </div>
+            <div id="bulkDeleteJobPanel" class="job-surface hidden" aria-live="polite">
+              <div class="job-head">
+                <div>
+                  <span id="bulkDeleteStatus" class="status-badge status-temporary">删除中</span>
+                  <strong id="bulkDeleteMessage">正在准备批量删除</strong>
+                </div>
+                <span id="bulkDeleteNumbers">0 / 0</span>
+              </div>
+              <progress id="bulkDeleteProgress" class="progress-bar danger-progress" max="100" value="0">0%</progress>
+              <div id="bulkDeleteResults" class="job-results"></div>
+            </div>
+          </div>
+
+          <div id="accountSelectionTools" class="price-bulk-tools account-selection-tools">
+            <label class="toggle-label"><input id="selectAccountPage" type="checkbox"><span>选择本页</span></label>
+            <span id="accountSelectedCount">已选 0 个</span>
+            <button id="clearAccountSelection" class="secondary compact" type="button" disabled>清空</button>
+            <button id="openPriceHistory" class="secondary compact admin-only" type="button">改价记录</button>
+            <button id="openBulkPrice" class="primary compact admin-only" type="button" disabled>批量改价</button>
+            <button id="copySelectedImportLines" class="secondary compact" type="button" disabled>复制上号信息</button>
+            <button id="openBulkReauth" class="primary compact" type="button" disabled>批量重新授权</button>
+            <button id="deleteSelectedErrorsButton" class="danger compact" type="button" disabled>删除所选</button>
+          </div>
+
+          <div id="deleteJobPanel" class="job-surface hidden" aria-live="polite">
+            <div class="job-head">
+              <div>
+                <span id="deleteJobStatus" class="status-badge status-temporary">删除中</span>
+                <strong id="deleteJobMessage">正在准备删除任务</strong>
+              </div>
+              <span id="deleteJobAccount">-</span>
+            </div>
+            <progress id="deleteJobProgress" class="progress-bar danger-progress" max="100" value="0">0%</progress>
+          </div>
+
+          <div id="accountDataSurface" class="data-surface">
+            <div id="accountLoading" class="loading-line hidden">正在读取账号和计费数据</div>
+            <div class="table-wrap desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="account-select-column" aria-label="选择账号">选</th>
+                    <th>账号</th>
+                    <th>sub2api 状态</th>
+                    <th>订阅类型</th>
+                    <th>账号价格</th>
+                    <th class="admin-only">归属</th>
+                    <th class="cost-visible">账号总计费</th>
+                    <th class="cost-visible">用量窗口</th>
+                    <th>请求数</th>
+                    <th id="diagnosticsColumn">拒答数</th>
+                    <th>上号时间</th>
+                    <th>存活时间</th>
+                    <th>最近使用</th>
+                    <th>备注</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="accountsBody"></tbody>
+              </table>
+            </div>
+            <div id="accountsMobile" class="mobile-cards"></div>
+            <div id="accountsEmpty" class="empty-state hidden">没有符合条件的账号</div>
+            <footer class="pagination">
+              <span id="paginationText">0 条</span>
+              <div>
+                <button id="prevPage" class="secondary compact" type="button">上一页</button>
+                <button id="nextPage" class="secondary compact" type="button">下一页</button>
+              </div>
+            </footer>
+          </div>
+          </div>
+          <section id="weeklyPanel" class="weekly-panel hidden" role="tabpanel" aria-labelledby="homeWeeklyTab">
+            <form id="weeklyFilters" class="weekly-filters">
+              <label><span>日期范围 · 北京时间</span><select id="weeklyPreset">
+                <option value="yesterday">昨天</option><option value="today" selected>今天（从现在起）</option><option value="tomorrow">明天</option><option value="next7">未来 7 天</option><option value="custom">自定义</option>
+              </select></label>
+              <label><span>开始时间（含）</span><input id="weeklyFrom" type="datetime-local" step="60" required></label>
+              <label><span>结束时间（不含）</span><input id="weeklyTo" type="datetime-local" step="60" required></label>
+              <fieldset id="weeklyKinds" class="weekly-choice-group"><legend>限额类型</legend><div class="weekly-choices">
+                <label><input type="checkbox" name="weeklyKind" value="5h">5h</label>
+                <label><input type="checkbox" name="weeklyKind" value="7d" checked>普通 7d</label>
+                <label><input type="checkbox" name="weeklyKind" value="7d_f">7df（F5）</label>
+              </div></fieldset>
+              <label><span>账号站点</span><select id="weeklySite"><option value="">全部站点</option><option value="main">主站</option><option value="ddd">DDD</option></select></label>
+              <label id="weeklyOwnerWrap" class="admin-only"><span>归属用户</span><select id="weeklyOwner"><option value="">全部用户</option><option value="unassigned">未分配</option></select></label>
+              <label><span>订阅类型</span><select id="weeklyTag"><option value="">全部类型</option><option value="5x">5x</option><option value="20x">20x</option><option value="unknown">未知</option></select></label>
+              <label class="weekly-search"><span>邮箱</span><input id="weeklySearch" type="search" placeholder="搜索邮箱" autocomplete="off"></label>
+              <div class="weekly-options">
+                <fieldset class="weekly-choice-group weekly-match"><legend>匹配方式</legend><div class="weekly-choices">
+                  <label title="任一所选类型的刷新时间在查询范围内"><input type="radio" name="weeklyMatch" value="any" checked>任一满足</label>
+                  <label title="同一账号的全部所选类型都在查询范围内刷新"><input type="radio" name="weeklyMatch" value="all">全部满足</label>
+                </div></fieldset>
+                <label class="toggle-label"><input id="weeklyIncludeErrors" type="checkbox"><span>包含错误账号</span></label>
+                <label class="toggle-label"><input id="weeklyLimitedOnly" type="checkbox"><span>仅已耗尽</span></label>
+              </div>
+            </form>
+            <p class="weekly-scope">预计刷新默认排除错误及已删除账号；历史记录按当时的状态保留。</p>
+            <div class="weekly-status-line">
+              <span id="weeklyStatus" role="status" aria-live="polite">等待查询</span>
+              <button id="weeklyRetry" class="icon-button" type="button" aria-label="刷新限额数据" title="刷新限额数据">↻</button>
+            </div>
+            <div id="weeklyOverview" class="weekly-overview" role="group" aria-label="限额状态筛选">
+              <button type="button" data-weekly-state="all" aria-pressed="true" title="账号去重计数；同一账号跨周期可出现在多个状态，状态数不可相加"><span>涉及账号（去重）</span><strong id="weeklyAccounts">-</strong><small id="weeklyEvents">- 次刷新</small></button>
+              <button type="button" data-weekly-state="upcoming" aria-pressed="false" title="即将刷新账号数，状态内去重"><span>即将刷新</span><strong id="weeklyUpcoming">-</strong><small>账号（去重）</small></button>
+              <button type="button" data-weekly-state="confirmed" aria-pressed="false" title="已有对应窗口新采样证据的账号数，状态内去重"><span>已确认刷新</span><strong id="weeklyConfirmed">-</strong><small>账号（去重）</small></button>
+              <button type="button" data-weekly-state="pending" aria-pressed="false" title="到期但缺少对应窗口的新采样证据；部分站点可能持续待确认" aria-describedby="weeklyPendingMeaning"><span>待确认</span><strong id="weeklyPending">-</strong><small>账号（去重）</small></button>
+            </div>
+            <div id="weeklyTypeCounts" class="weekly-type-counts" aria-label="各限额类型统计"></div>
+            <p id="weeklyPendingMeaning" class="sr-only">待确认：到期但缺少对应窗口的新采样证据。账号按状态去重，同一账号跨周期可出现在多个状态，状态数不可相加。</p>
+            <div class="weekly-coverage">
+              <p id="weeklyCoverage">未知刷新时间账号：- · 观测覆盖：-</p>
+              <p id="weeklyHistory">仅覆盖上线后观测；上线前历史不完整。</p>
+              <ul id="weeklyKindCoverage" class="weekly-kind-coverage" aria-label="各限额类型观测覆盖"></ul>
+              <details><summary>站点采样与错误</summary><ul id="weeklySites"><li>等待采样信息</li></ul></details>
+            </div>
+            <div class="weekly-heading">
+              <div class="weekly-modes" role="group" aria-label="限额结果视图">
+                <button type="button" data-weekly-mode="days" aria-pressed="true">按天</button>
+                <button type="button" data-weekly-mode="accounts" aria-pressed="false">按账号</button>
+              </div>
+              <button id="weeklyExport" class="secondary compact" type="button" disabled><span aria-hidden="true">↓</span> 导出 CSV</button>
+            </div>
+            <div class="weekly-detail-heading">
+              <button id="weeklyBack" class="icon-button" type="button" aria-label="返回按天视图" title="返回按天视图" disabled>←</button>
+              <h3 id="weeklyResultTitle">每日刷新</h3>
+              <span id="weeklyExportStatus" role="status" aria-live="polite"></span>
+            </div>
+            <div id="weeklyResults" class="weekly-results" aria-busy="false">
+              <div id="weeklyDaysWrap" class="table-wrap">
+                <table class="weekly-days-table"><caption class="sr-only">每日刷新汇总；账号跨类型去重，按类型统计刷新次数；全部满足按完整查询范围匹配</caption><thead><tr><th>北京时间</th><th>涉及账号</th><th>刷新次数</th><th>按类型（次数）</th><th>即将账号</th><th>确认账号</th><th>待确认账号</th></tr></thead><tbody id="weeklyDays"></tbody></table>
+              </div>
+              <div id="weeklyRowsWrap" class="table-wrap hidden">
+                <table class="weekly-rows-table"><caption class="sr-only">限额刷新事件</caption><thead><tr><th>账号 / 归属</th><th>站点 / 类型</th><th>刷新时间（北京）</th><th>刷新状态</th><th>用量 / 调度</th><th>观测时间（北京）</th></tr></thead><tbody id="weeklyRows"></tbody></table>
+              </div>
+              <div id="weeklyEmpty" class="empty-state">正在读取限额刷新记录</div>
+            </div>
+            <footer id="weeklyPagination" class="weekly-pagination">
+              <span id="weeklyPaginationText">-</span><div>
+                <button id="weeklyPrev" class="icon-button" type="button" aria-label="上一页" title="上一页" disabled>‹</button>
+                <button id="weeklyNext" class="icon-button" type="button" aria-label="下一页" title="下一页" disabled>›</button>
+              </div>
+            </footer>
+          </section>
+        </section>
+
+        <section id="view-add" class="view">
+          <div id="addQuotaBand" class="quota-band">
+            <div id="addAvailableMetric">
+              <span>当前站点可补</span>
+              <strong id="addAvailable">0</strong>
+            </div>
+            <div id="addProgressMetric">
+              <span id="addReservedLabel">我的待完成</span>
+              <strong id="addReserved">0</strong>
+              <small id="addProgressDetail">排队 0 · 等待授权 0 · 执行中 0</small>
+              <select id="addProgressOwner" class="admin-only hidden" aria-label="待完成任务用户">
+                <option value="">站点全部用户</option>
+              </select>
+            </div>
+            <div>
+              <span>当前站点缺口</span>
+              <strong id="addDeficit">0</strong>
+            </div>
+            <div>
+              <span>代理池可分配</span>
+              <strong id="proxyAvailable">-</strong>
+              <small id="proxyPoolDetail">正在读取</small>
+            </div>
+            <div>
+              <span>目标服务器</span>
+              <strong id="addTargetServer" class="server-value">自动分配</strong>
+            </div>
+            <div>
+              <span>上号站点</span>
+              <strong id="addTargetSite" class="server-value">主站</strong>
+            </div>
+          </div>
+
+          <div id="addMode" class="auth-mode-tabs" role="tablist" aria-label="上号方式">
+            <button class="secondary active" data-auth-mode="cookie" type="button">Cookie 批量 (旧版)</button>
+            <button class="secondary" data-auth-mode="login" type="button">OAuth 账号登录</button>
+            <button class="secondary" data-auth-mode="setup_token" type="button">Setup Token</button>
+            <button class="secondary" data-auth-mode="batch" type="button">批量授权</button>
+            <button class="secondary" data-auth-mode="sk_auth" type="button">SK OAuth 登录</button>
+          </div>
+
+          <form id="addForm" class="form-surface">
+            <div class="form-row upload-options">
+              <label class="admin-only" id="addOwnerWrap">
+                <span>账号归属</span>
+                <select id="addOwner"></select>
+              </label>
+              <label id="skAuthBillingWrap" class="hidden">
+                <span>默认订阅类型</span>
+                <select id="skAuthBillingTag">
+                  <option value="20x" selected>20x</option>
+                  <option value="5x">5x</option>
+                </select>
+              </label>
+            </div>
+            <div id="cookieAuthFields" class="bulk-input-grid">
+              <label>
+                <span>账号内容</span>
+                <textarea id="bulkRaw" rows="13" spellcheck="false" placeholder="账号与 Session Key"></textarea>
+              </label>
+              <label>
+                <span>对应代理（留空则使用代理池）</span>
+                <textarea id="bulkProxies" rows="13" spellcheck="false" placeholder="http://user:pass@host:port"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <span><span id="recognizedCount">识别 0 个账号</span> · <span id="proxyAssignmentCount">自带 0 · 池分配 0</span></span>
+              <button id="startAddButton" class="primary" type="submit">开始上号</button>
+            </div>
+            <div id="addError" class="form-error" role="alert"></div>
+          </form>
+
+          <form id="batchAuthForm" class="form-surface batch-auth-form hidden">
+            <div class="batch-auth-fields">
+              <label>
+                <span>授权方式</span>
+                <select id="batchAuthType">
+                  <option value="login">OAuth 账号登录</option>
+                  <option value="setup_token">Setup Token</option>
+                </select>
+              </label>
+              <label id="batchLoginMethodWrap">
+                <span>登录账号类型</span>
+                <select id="batchLoginMethod">
+                  <option value="claudeai">订阅号</option>
+                  <option value="console">Claude Console</option>
+                  <option value="sso">企业 SSO</option>
+                </select>
+              </label>
+              <label>
+                <span>订阅类型</span>
+                <select id="batchBillingTag">
+                  <option value="20x" selected>20x</option>
+                  <option value="5x">5x</option>
+                </select>
+              </label>
+              <label class="admin-only" id="batchOwnerWrap">
+                <span>账号归属</span>
+                <select id="batchOwner"></select>
+              </label>
+            </div>
+            <div class="bulk-input-grid batch-auth-inputs">
+              <label>
+                <span>账号邮箱或名称（每行一个）</span>
+                <textarea id="batchProviderNames" rows="10" maxlength="4096" spellcheck="false" placeholder="user1@example.com&#10;user2@example.com"></textarea>
+              </label>
+              <label>
+                <span>对应代理（留空则使用代理池）</span>
+                <textarea id="batchProxies" rows="10" maxlength="32768" spellcheck="false" placeholder="http://user:pass@host:port"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <span><span id="batchRecognizedCount">识别 0 个账号</span> · <span id="batchProxyCount">自带 0 · 池分配 0</span></span>
+              <button id="startBatchAuthButton" class="primary" type="submit" disabled>批量生成授权链接</button>
+            </div>
+            <div id="batchAuthError" class="form-error" role="alert"></div>
+          </form>
+
+          <form id="browserAuthForm" class="form-surface browser-auth-form hidden">
+            <div class="browser-auth-fields">
+              <label>
+                <span>账号邮箱或名称</span>
+                <input id="browserProviderName" maxlength="100" autocomplete="email" required>
+              </label>
+              <label>
+                <span>订阅类型</span>
+                <select id="browserBillingTag">
+                  <option value="20x" selected>20x</option>
+                  <option value="5x">5x</option>
+                </select>
+              </label>
+              <label>
+                <span>指定代理（留空则使用代理池）</span>
+                <input id="browserProxy" maxlength="4096" placeholder="http://user:pass@host:port">
+              </label>
+              <label class="admin-only" id="browserOwnerWrap">
+                <span>账号归属</span>
+                <select id="browserOwner"></select>
+              </label>
+            </div>
+            <div class="form-actions">
+              <span id="browserAuthHint">授权完成后会自动启动容器并加入账号池</span>
+              <button id="startBrowserAuthButton" class="primary" type="submit">生成授权链接</button>
+            </div>
+            <div id="browserAuthError" class="form-error" role="alert"></div>
+          </form>
+
+          <div id="activeBrowserAuth" class="job-surface browser-auth-session hidden" aria-live="polite">
+            <div class="job-head">
+              <div>
+                <span id="browserAuthStatus" class="status-badge status-temporary">准备中</span>
+                <strong id="browserAuthMessage">正在分配容器和代理</strong>
+              </div>
+              <span id="browserAuthExpires">-</span>
+            </div>
+            <div id="browserAuthLinkRow" class="browser-auth-link-row hidden">
+              <label>
+                <span>授权链接</span>
+                <input id="browserAuthUrl" type="url" readonly spellcheck="false" aria-label="授权链接">
+              </label>
+              <button id="copyBrowserAuth" class="secondary" type="button" disabled>复制链接</button>
+              <button id="openBrowserAuth" class="primary" type="button" disabled>打开授权页</button>
+            </div>
+            <div id="browserAuthActions" class="browser-auth-actions">
+              <label id="browserAuthCodeWrap" class="hidden">
+                <span>浏览器显示的授权码</span>
+                <input id="browserAuthCode" autocomplete="off" spellcheck="false" maxlength="8192">
+              </label>
+              <button id="submitBrowserAuthCode" class="primary hidden" type="button">完成授权</button>
+              <button id="cancelBrowserAuth" class="secondary" type="button">取消</button>
+              <button id="retryBrowserAuth" class="secondary hidden" type="button">重试账号登记</button>
+            </div>
+            <div id="browserAuthSessionError" class="form-error" role="alert"></div>
+          </div>
+
+          <div id="activeBatchAuth" class="job-surface batch-auth-session hidden" aria-live="polite">
+            <div class="job-head batch-auth-head">
+              <div>
+                <span id="batchAuthStatus" class="status-badge status-temporary">准备中</span>
+                <strong id="batchAuthMessage">正在创建批量授权任务</strong>
+              </div>
+              <span id="batchAuthNumbers">0 / 0</span>
+            </div>
+            <div id="batchAuthItems" class="batch-auth-list"></div>
+            <div id="batchAuthSessionError" class="form-error" role="alert"></div>
+          </div>
+
+          <div id="activeJob" class="job-surface hidden">
+            <div class="job-head">
+              <div>
+                <span id="jobStatus" class="status-badge">等待</span>
+                <strong id="jobMessage">任务准备中</strong>
+              </div>
+              <div class="job-head-actions">
+                <span id="jobNumbers">0 / 0</span>
+                <button id="cancelQueuedSkBatch" class="secondary compact hidden" type="button">取消排队</button>
+              </div>
+            </div>
+            <progress id="jobProgress" class="progress-bar" max="100" value="0">0%</progress>
+            <div id="jobEvents" class="job-events"></div>
+            <div id="failedImportCopyTools" class="bulk-delete-tools hidden">
+              <span id="failedImportCopyCount">失败 0 个</span>
+              <button id="copyFailedImportsButton" class="secondary compact" type="button">复制全部失败</button>
+            </div>
+            <div id="jobResults" class="job-results"></div>
+          </div>
+
+          <div class="section-head">
+            <h3>最近授权任务</h3>
+            <button id="refreshAuthJobs" class="secondary compact" type="button">刷新</button>
+          </div>
+          <div id="authJobsList" class="job-list"></div>
+
+          <div class="section-head">
+            <h3>最近 SK 任务</h3>
+            <button id="refreshJobs" class="secondary compact" type="button">刷新</button>
+          </div>
+          <div id="jobsList" class="job-list"></div>
+        </section>
+
+        <section id="view-claude-sk" class="view admin-only">
+          <form id="claudeSkForm" class="form-surface claude-sk-form">
+            <div class="claude-sk-input-grid">
+              <label>
+                <span>邮箱账号 / Session Key</span>
+                <textarea id="claudeSkRaw" rows="8" maxlength="200000" spellcheck="false" placeholder="邮箱密码方式：user@mail.com----password&#10;SK 登录方式：user@mail.com----sk-ant-sid..."></textarea>
+              </label>
+              <div class="claude-sk-options">
+                <label>
+                  <span>SK / 退款指定代理</span>
+                  <input id="claudeSkProxy" maxlength="2048" placeholder="http://user:pass@host:port">
+                </label>
+                <label>
+                  <span>并发数量</span>
+                  <input id="claudeSkConcurrency" type="number" min="1" max="10" step="1" value="10">
+                </label>
+                <label>
+                  <span>自动授权归属</span>
+                  <select id="claudeSkOwner"></select>
+                </label>
+                <label>
+                  <span>自动授权订阅</span>
+                  <select id="claudeSkBillingTag">
+                    <option value="20x">20x</option>
+                    <option value="5x">5x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="form-actions claude-sk-form-actions">
+              <span id="claudeSkRecognized">待处理 0 个</span>
+              <div>
+                <button id="claudeSkGenerate" class="secondary" type="button">生成表格</button>
+                <button id="claudeSkStart" class="primary" type="submit" disabled>开始获取</button>
+                <button id="claudeSkAuthorize" class="primary" type="button" disabled>自动授权</button>
+                <button id="claudeSkAuthorizeByKey" class="primary" type="button" disabled>SK OAuth 登录</button>
+                <button id="claudeSkRefund" class="secondary" type="button" disabled>检测退款</button>
+                <button id="claudeSkPause" class="secondary" type="button" disabled>暂停</button>
+                <button id="claudeSkCopyFailed" class="secondary" type="button" disabled>复制失败</button>
+                <button id="claudeSkExport" class="secondary" type="button" disabled>导出结果</button>
+                <button id="claudeSkClear" class="danger" type="button">清空</button>
+              </div>
+            </div>
+            <div id="claudeSkError" class="form-error" role="alert"></div>
+          </form>
+
+          <div class="metrics-grid claude-sk-metrics">
+            <article class="metric"><span>任务总数</span><strong id="claudeSkTotal">0</strong></article>
+            <article class="metric metric-good"><span>获取成功</span><strong id="claudeSkSuccess">0</strong></article>
+            <article class="metric"><span>需要处理</span><strong id="claudeSkWaiting">0</strong></article>
+            <article class="metric metric-danger"><span>失败 / 封号</span><strong id="claudeSkFailed">0</strong></article>
+            <article class="metric metric-good"><span>发现退款</span><strong id="claudeSkRefunded">0</strong></article>
+          </div>
+
+          <div id="claudeSkResults" class="data-surface claude-sk-results">
+            <div class="surface-head">
+              <div><h3>Claude 账号 / 退款检测任务</h3><span id="claudeSkRunState" class="scope-badge">空闲</span></div>
+              <button id="claudeSkRefresh" class="secondary compact" type="button">刷新</button>
+            </div>
+            <div class="table-wrap desktop-table claude-sk-table-wrap">
+              <table class="claude-sk-table">
+                <thead>
+                  <tr><th>#</th><th>邮箱</th><th>密码</th><th>模式</th><th>任务状态</th><th>账号状态</th><th>结果</th><th>信息</th><th>操作</th></tr>
+                </thead>
+                <tbody id="claudeSkBody"></tbody>
+              </table>
+            </div>
+            <div id="claudeSkMobile" class="mobile-cards"></div>
+            <div id="claudeSkEmpty" class="empty-state">暂无任务</div>
+          </div>
+        </section>
+
+        <section id="view-users" class="view admin-only">
+          <form id="createUserForm" class="form-surface inline-form">
+            <label><span>用户名</span><input id="newUsername" required></label>
+            <label><span>初始密码</span><input id="newPassword" type="password" minlength="8" required></label>
+            <label><span>上号站点</span><select id="newSiteId" required></select></label>
+            <button class="primary" type="submit">新增用户</button>
+            <div id="userFormError" class="form-error" role="alert"></div>
+          </form>
+          <div class="data-surface">
+            <div class="table-wrap desktop-table users-table">
+              <table>
+                <thead><tr><th>用户</th><th>角色</th><th>上号站点</th><th>账号数</th><th>今日上号</th><th>账号成本</th><th>调度优先级</th><th>用量展示倍率</th><th>实时汇总</th><th>状态</th><th>重置密码</th><th></th></tr></thead>
+                <tbody id="usersBody"></tbody>
+              </table>
+            </div>
+            <div id="usersMobile" class="mobile-cards"></div>
+          </div>
+        </section>
+
+        <section id="view-servers" class="view admin-only">
+          <div class="server-settings-grid">
+            <form id="globalSettingsForm" class="form-surface settings-form site-quota-settings-form">
+              <div class="settings-form-heading"><h3>站点上号额度</h3><span>各站点独立计算可补数量</span></div>
+              <div id="siteQuotaSettingsList" class="site-quota-settings-list"></div>
+              <div id="settingsFormError" class="form-error" role="alert"></div>
+            </form>
+            <form id="targetServerForm" class="form-surface server-setting-form">
+              <label><span>所有成员新账号目标服务器</span><select id="targetServer"><option value="">自动分配</option></select></label>
+              <button class="primary" type="submit">保存目标</button>
+              <div id="targetServerError" class="form-error" role="alert"></div>
+            </form>
+            <section class="form-surface sub2api-site-controls" aria-labelledby="sub2apiSiteControlsTitle">
+              <div class="sub2api-site-controls-head">
+                <h3 id="sub2apiSiteControlsTitle">站点调度策略</h3>
+                <div class="sub2api-site-controls-columns" aria-hidden="true"><span>容量自动编排</span><span>扩容 / 缩容阈值</span><span>新账号默认调度</span><span>缓存 TTL 策略</span></div>
+              </div>
+              <div id="sub2apiSiteControlsList" class="sub2api-site-controls-list"></div>
+              <div id="sub2apiSiteControlsError" class="form-error" role="alert"></div>
+            </section>
+            <form id="addDefaultsForm" class="form-surface add-defaults-form">
+              <label><span>上号 sub2api 默认并发</span><input id="defaultSub2apiConcurrency" type="number" min="1" max="100" step="1" required></label>
+              <label><span>容器最大进程数</span><input id="defaultIsthmusMaxProcs" type="number" min="1" max="1000" step="1" required></label>
+              <button class="primary" type="submit">保存上号配置</button>
+              <div id="addDefaultsError" class="form-error" role="alert"></div>
+            </form>
+          </div>
+          <dialog id="settlementRateDialog" class="detail-dialog settlement-rate-dialog" aria-labelledby="settlementRateTitle">
+            <div id="settlementRatePanel" class="data-surface settlement-rate-surface">
+            <header class="surface-head">
+              <div>
+                <h3 id="settlementRateTitle">用户结算设置</h3>
+                <span id="settlementRateTimezone" class="scope-badge">Asia/Shanghai</span>
+              </div>
+              <div class="settlement-dialog-actions">
+                <button id="refreshSettlementRates" class="secondary compact" type="button">刷新</button>
+                <button id="closeSettlementRateDialog" class="icon-button" type="button" aria-label="关闭">×</button>
+              </div>
+            </header>
+            <div class="settlement-current" aria-live="polite">
+              <div><span>结算用户</span><strong id="settlementRateUsername">-</strong></div>
+              <div><span>当前方式</span><strong id="settlementCurrentMode">读取中</strong></div>
+              <div><span>当前价格规则</span><strong id="settlementCurrentFactor">-</strong></div>
+              <div><span>生效时间</span><strong id="settlementCurrentEffectiveFrom">-</strong></div>
+            </div>
+            <form id="settlementRateForm" class="settlement-rate-form">
+              <label><span>结算方式</span><select id="settlementMode"><option value="usage">按用量</option><option value="account">按上号</option></select></label>
+              <label><span>生效时间（北京时间）</span><input id="settlementEffectiveFrom" type="datetime-local" step="60" required></label>
+              <label id="settlementUsageFields"><span>结算倍率</span><input id="settlementFactor" type="number" min="0" step="0.000001" inputmode="decimal" placeholder="0.7" required></label>
+              <label id="settlementAccountTypeFields" class="hidden"><span>按号定价方式</span><select id="settlementAccountPriceType" disabled><option value="fixed">固定单价</option><option value="survival">按存活时长分档</option><option value="subscription">按订阅类型</option></select></label>
+              <label id="settlementFixedFields" class="hidden"><span>每个号的价格</span><input id="settlementAccountUnitPrice" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="输入单价" disabled></label>
+              <div id="settlementSubscriptionFields" class="settlement-subscription-fields settlement-form-wide hidden">
+                <label><span>5x 单价</span><input id="settlementSubscriptionPrice5x" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="输入单价" disabled></label>
+                <label><span>20x 单价</span><input id="settlementSubscriptionPrice20x" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="输入单价" disabled></label>
+              </div>
+              <div id="settlementTierFields" class="settlement-tier-fields hidden">
+                <div class="settlement-tier-heading"><span>存活时长与每号价格</span><button id="addSettlementTier" class="secondary compact" type="button" disabled>添加时段</button></div>
+                <p class="settlement-help">各时段设置累计价格，按存活时长所在档位结算；超过最后一个时段使用末档价格。</p>
+                <div id="settlementTierRows" class="settlement-tier-rows"></div>
+              </div>
+              <p id="settlementEffectiveHint" class="settlement-help settlement-form-wide">按用量的倍率按生效分钟计算。</p>
+              <label class="settlement-note-field"><span>备注</span><input id="settlementNote" maxlength="200" placeholder="调整原因（可选）"></label>
+              <button id="saveSettlementRate" class="primary" type="submit">保存结算规则</button>
+              <div id="settlementRateError" class="form-error" role="alert"></div>
+            </form>
+            <section class="settlement-rule-section" aria-labelledby="settlementScheduledTitle">
+              <div class="settlement-rule-section-head"><h4 id="settlementScheduledTitle">未来排期</h4></div>
+              <div class="settlement-rule-list-head settlement-scheduled-grid" aria-hidden="true">
+                <span>生效时间</span><span>结算方式 / 价格</span><span>备注</span><span>创建时间</span><span>操作</span>
+              </div>
+              <div id="settlementScheduledList" class="settlement-rule-list settlement-scheduled-list"></div>
+              <div id="settlementScheduledEmpty" class="empty-state settlement-empty">暂无未来排期</div>
+            </section>
+            <section class="settlement-rule-section" aria-labelledby="settlementHistoryTitle">
+              <div class="settlement-rule-section-head"><h4 id="settlementHistoryTitle">历史记录</h4></div>
+              <div class="settlement-rule-list-head settlement-history-grid" aria-hidden="true">
+                <span>生效时间</span><span>结算方式 / 价格</span><span>备注</span><span>状态</span><span>创建时间</span>
+              </div>
+              <div id="settlementHistoryList" class="settlement-rule-list settlement-history-list"></div>
+              <div id="settlementHistoryEmpty" class="empty-state settlement-empty">暂无历史记录</div>
+            </section>
+            </div>
+          </dialog>
+          <div class="section-head">
+            <h3>服务器资源</h3>
+            <button id="refreshServerLoad" class="secondary compact" type="button">刷新</button>
+          </div>
+          <div id="serverLoadGrid" class="server-load-grid"></div>
+          <div id="serverLoadEmpty" class="empty-state hidden">没有服务器数据</div>
+        </section>
+
+        <section id="view-stats" class="view">
+          <div class="toolbar">
+            <label><span>开始日期</span><input id="statsFrom" type="date"></label>
+            <label><span>结束日期</span><input id="statsTo" type="date"></label>
+            <label id="statsUserWrap" class="admin-only"><span>用户</span><select id="statsUser"><option value="">全部用户</option></select></label>
+            <button id="refreshStats" class="secondary align-end" type="button">查询</button>
+            <button id="rebuildStats" class="secondary align-end hidden" type="button">重新生成</button>
+          </div>
+          <p id="statsSnapshotStatus" class="hidden" role="status" aria-live="polite" style="overflow-wrap:anywhere">统计快照尚未生成</p>
+          <div class="metrics-grid stats-metrics">
+            <article class="metric"><span>计费账号数</span><strong id="statsTotal">0</strong></article>
+            <article class="metric"><span>用量账号数</span><strong id="statsUsageAccounts">0</strong></article>
+            <article class="metric"><span>请求数</span><strong id="statsRequests">0</strong></article>
+            <article class="metric metric-money"><span>账号成本增量</span><strong id="statsCost">0.00</strong></article>
+            <article class="metric metric-money"><span>每日总计费</span><strong id="statsBillingTotal">0.00</strong></article>
+            <article class="metric metric-money"><span>结算总额</span><strong id="statsSettlementTotal">0.00</strong></article>
+            <article class="metric"><span>有记录天数</span><strong id="statsDays">0</strong></article>
+            <article class="metric"><span>参与用户</span><strong id="statsUsers">0</strong></article>
+          </div>
+          <div class="data-surface">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>日期</th><th>用户</th><th>新增账号</th><th>用量账号</th><th>请求数</th><th>平均账号成本</th><th>账号成本增量</th><th>总计费</th><th>结算总额</th></tr></thead>
+                <tbody id="statsBody"></tbody>
+              </table>
+            </div>
+            <div id="statsEmpty" class="empty-state hidden">当前日期范围没有成本记录</div>
+          </div>
+        </section>
+
+        <section id="view-request-ips" class="view admin-only">
+          <form id="requestIPFilters" class="quality-filters">
+            <label><span>站点</span><select id="requestIPSite"><option value="main">主站</option><option value="ddd">DDD</option></select></label>
+            <label><span>状态</span><select id="requestIPState"><option value="pending">新增待确认</option><option value="all">全部</option><option value="normal">已确认正常</option><option value="blocked">已封禁</option><option value="baseline">历史基线</option></select></label>
+            <label><span>最近请求</span><select id="requestIPPeriod"><option value="all">全部时间</option><option value="1">24 小时内</option><option value="7">7 天内</option><option value="30">30 天内</option></select></label>
+            <label><span>用户 / 来源 IP</span><input id="requestIPSearch" type="search" placeholder="邮箱、UID、IP" maxlength="256"></label>
+            <button class="secondary align-end" type="submit">查询</button>
+          </form>
+          <div id="requestIPError" class="form-error" role="alert"></div>
+          <div id="requestIPStatus" class="quality-status" role="status" aria-live="polite"></div>
+          <div id="requestIPOverview" class="quality-overview"></div>
+          <details class="quality-coverage"><summary>采集与规则状态</summary><div id="requestIPHealth"></div></details>
+          <div class="data-surface"><div class="table-wrap">
+            <table class="ip-table" aria-label="用户请求来源 IP">
+              <thead><tr><th>用户 / 来源 IP</th><th>首次发现 / 最近请求</th><th>模型请求 · 24h / 5m</th><th>Key / 共享用户</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="requestIPRows"></tbody>
+            </table>
+          </div><div id="requestIPEmpty" class="empty-state hidden">没有符合条件的来源 IP</div>
+            <div class="quality-pagination"><span id="requestIPPage"></span><div><button id="requestIPPrev" class="icon-button" type="button" aria-label="上一页" title="上一页">←</button><button id="requestIPNext" class="icon-button" type="button" aria-label="下一页" title="下一页">→</button></div></div>
+          </div>
+        </section>
+
+        <section id="view-request-quality" class="view admin-only">
+          <form id="requestQualityFilters" class="quality-filters">
+            <label><span>站点</span><select id="requestQualitySite"><option value="main">主站</option><option value="ddd">ddd</option><option value="all">全部站点</option></select></label>
+            <label><span>时间范围</span><select id="requestQualityPeriod"><option value="today">今天</option><option value="7days">最近 7 天</option><option value="custom">自定义</option></select></label>
+            <label><span>开始日期</span><input id="requestQualityFrom" type="date" required></label>
+            <label><span>结束日期</span><input id="requestQualityTo" type="date" required></label>
+            <label><span>模型</span><select id="requestQualityModel"><option value="">全部模型</option></select></label>
+            <label><span>Sub2API 用户</span><input id="requestQualitySearch" type="search" placeholder="邮箱 / UID" maxlength="200"></label>
+            <label><span>排序</span><select id="requestQualitySort"><option value="refusals">拒答数从高到低</option><option value="rate">拒答率从高到低</option><option value="observed">请求数从高到低</option></select></label>
+            <button class="secondary align-end" type="submit">查询</button>
+          </form>
+          <div id="requestQualityError" class="form-error" role="alert"></div>
+          <div id="requestQualityStatus" class="quality-status" role="status" aria-live="polite"></div>
+          <div id="requestQualityOverview" class="quality-overview" aria-live="polite"></div>
+          <div id="requestQualityCoverage" class="quality-coverage"></div>
+          <div class="data-surface quality-results">
+            <div id="requestQualityLoading" class="loading-line hidden" aria-hidden="true"></div>
+            <table class="quality-table" aria-label="Sub2API 用户拒答统计">
+              <thead><tr><th>用户 / 站点</th><th class="quality-wide">总请求</th><th class="quality-wide">拒答数</th><th>拒答率</th><th class="quality-wide">零输出待查</th></tr></thead>
+              <tbody id="requestQualityUsers"></tbody>
+            </table>
+            <div id="requestQualityEmpty" class="empty-state hidden">没有符合条件的用户</div>
+            <div class="quality-pagination">
+              <label class="quality-page-size"><span>每页</span><select id="requestQualityPageSize"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select></label>
+              <span id="requestQualityPage" role="status"></span>
+              <div><button id="requestQualityPrev" class="icon-button" type="button" aria-label="上一页用户" title="上一页">←</button><button id="requestQualityNext" class="icon-button" type="button" aria-label="下一页用户" title="下一页">→</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-account-errors" class="view">
+          <form id="errorStatsFilters" class="error-stats-filters">
+            <label><span>上号日期起</span><input id="errorStatsFrom" type="date" required></label>
+            <label><span>上号日期止</span><input id="errorStatsTo" type="date" required></label>
+            <label><span>站点</span><select id="errorStatsSite"><option value="">全部站点</option><option value="main">主站</option><option value="ddd">ddd</option></select></label>
+            <label class="admin-only"><span>上号归属</span><select id="errorStatsOwner"><option value="">全部用户</option></select></label>
+            <label><span>订阅类型</span><select id="errorStatsTag"><option value="">全部订阅</option><option value="5x">5x</option><option value="20x">20x</option><option value="unknown">未记录</option></select></label>
+            <label><span>来源</span><select id="errorStatsSource"><option value="">全部来源</option><option value="new">新上号</option><option value="migration">迁移接入</option><option value="bootstrap">历史导入</option></select></label>
+            <label class="error-stats-search"><span>账号 / 用户</span><input id="errorStatsSearch" type="search" placeholder="邮箱、用户名" maxlength="200"></label>
+            <div class="error-stats-actions"><button class="primary" type="submit">查询</button><button id="errorStatsExport" class="secondary" type="button">导出结果</button></div>
+          </form>
+          <div id="errorStatsMessage" class="form-error" role="alert"></div>
+          <div id="errorStatsFreshness" class="error-stats-freshness" role="status"></div>
+          <div id="errorStatsOverview" class="error-stats-overview"></div>
+          <div class="error-stats-heading">
+            <div><button id="errorStatsBack" class="icon-button hidden" type="button" aria-label="返回用户汇总" title="返回用户汇总">←</button><h3 id="errorStatsTitle">用户汇总</h3></div>
+            <label id="errorStatsStateWrap" class="hidden"><span>账号状态</span><select id="errorStatsState"><option value="error">未恢复错误</option><option value="">全部状态</option><option value="recovered">已恢复</option><option value="normal">正常</option><option value="archived">已删除</option><option value="unknown">状态不明</option></select></label>
+          </div>
+          <div class="data-surface">
+            <div class="table-wrap"><table class="error-stats-table" aria-label="上号错误统计"><thead id="errorStatsHead"></thead><tbody id="errorStatsRows"></tbody></table></div>
+            <div id="errorStatsEmpty" class="empty-state hidden">没有符合条件的记录</div>
+            <div class="error-stats-pagination"><span id="errorStatsPage" role="status"></span><div><button id="errorStatsPrev" class="icon-button" type="button" aria-label="上一页" title="上一页">←</button><button id="errorStatsNext" class="icon-button" type="button" aria-label="下一页" title="下一页">→</button></div></div>
+          </div>
+        </section>
+
+        <section id="view-auth-stats" class="view">
+          <div class="toolbar">
+            <label><span>开始日期</span><input id="authStatsFrom" type="date"></label>
+            <label><span>结束日期</span><input id="authStatsTo" type="date"></label>
+            <label id="authStatsUserWrap" class="admin-only"><span>用户</span><select id="authStatsUser"><option value="">全部用户</option></select></label>
+            <button id="refreshAuthStats" class="secondary align-end" type="button">查询</button>
+          </div>
+          <div class="data-surface">
+            <div id="authStatsLoading" class="loading-line hidden" aria-hidden="true"></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>上号方式</th><th>上号数</th><th>掉登数</th><th>掉登率</th></tr></thead>
+                <tbody id="authStatsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="requestIPDialog" class="detail-dialog quality-dialog" aria-labelledby="requestIPDialogTitle">
+    <div class="dialog-head"><h3 id="requestIPDialogTitle">来源 IP</h3><button id="requestIPClose" class="icon-button" type="button" aria-label="关闭" title="关闭">×</button></div>
+    <div id="requestIPIdentity" class="ip-identity"></div>
+    <div id="requestIPDialogError" class="form-error" role="alert"></div>
+    <form id="requestIPActionForm">
+      <label><span>作用范围</span><select id="requestIPScope"><option value="user">仅当前站点的这个用户</option><option value="site">当前站点所有用户</option></select></label>
+      <label id="requestIPDurationWrap"><span>期限</span><select id="requestIPDuration"><option value="0">永久，直至手动解除</option><option value="3600">1 小时</option><option value="86400">24 小时</option></select></label>
+      <label id="requestIPReasonWrap"><span>原因</span><input id="requestIPReason" maxlength="500" required></label>
+      <div id="requestIPImpact" class="quality-status"></div>
+      <button id="requestIPConfirm" class="primary" type="submit">确认封禁</button>
+    </form>
+    <div id="requestIPHistory" class="ip-history"></div>
+  </dialog>
+
+  <dialog id="requestQualityDialog" class="detail-dialog quality-dialog" aria-labelledby="requestQualityDetailTitle">
+    <div class="dialog-head"><div><h3 id="requestQualityDetailTitle">用户请求质量</h3><div id="requestQualityDetailIdentity" class="muted"></div></div><button id="requestQualityClose" class="icon-button" type="button" aria-label="关闭用户请求质量" title="关闭">×</button></div>
+    <div id="requestQualityDetailStatus" class="quality-status" role="status" aria-live="polite"></div>
+    <div id="requestQualityDetailError" class="form-error" role="alert"></div>
+    <div id="requestQualityDetailCoverage" class="quality-coverage"></div>
+    <div id="requestQualityDetailContent">
+      <div id="requestQualityDetailOverview" class="quality-overview"></div>
+      <section class="quality-detail-section"><h4>按模型</h4><div id="requestQualityModels"></div></section>
+      <section class="quality-detail-section"><h4>异常请求</h4><div id="requestQualityEvents"></div></section>
+      <div class="quality-pagination"><span id="requestQualityEventPage" role="status"></span><div><button id="requestQualityEventPrev" class="icon-button" type="button" aria-label="上一页请求" title="上一页">←</button><button id="requestQualityEventNext" class="icon-button" type="button" aria-label="下一页请求" title="下一页">→</button></div></div>
+    </div>
+  </dialog>
+
+  <dialog id="userRuntimeConfigDialog" class="detail-dialog user-runtime-dialog" aria-labelledby="userRuntimeConfigTitle">
+    <div class="dialog-head">
+      <div><h3 id="userRuntimeConfigTitle">用户运行配置</h3><span id="userRuntimeConfigUsername" class="scope-badge">-</span></div>
+      <button id="closeUserRuntimeConfig" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <form id="userRuntimeConfigForm" class="user-runtime-form">
+      <label><span>Sub2API 账号并发</span><input id="userRuntimeSub2apiConcurrency" type="number" min="1" max="100" step="1"></label>
+      <label><span>容器 max-procs</span><input id="userRuntimeIsthmusMaxProcs" type="number" min="1" max="1000" step="1"></label>
+      <label><span>CPU</span><input id="userRuntimeContainerCpus" type="number" min="1" max="256" step="1"></label>
+      <label><span>内存 GiB</span><input id="userRuntimeContainerMemoryGiB" type="number" min="1" max="1024" step="1"></label>
+      <label><span>内存 + 交换 GiB</span><input id="userRuntimeContainerMemorySwapGiB" type="number" min="1" max="4096" step="1"></label>
+      <label><span>PID 限制</span><input id="userRuntimeContainerPidsLimit" type="number" min="1" max="1048576" step="1"></label>
+      <div id="userRuntimeConfigError" class="form-error" role="alert"></div>
+      <div class="user-runtime-actions">
+        <button id="clearUserRuntimeConfig" class="secondary" type="button">全部继承</button>
+        <button id="saveUserRuntimeConfig" class="primary" type="submit">保存配置</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="accountDialog" class="detail-dialog">
+    <div class="dialog-head">
+      <div><span id="detailStatus" class="status-badge"></span><h3 id="detailName">账号详情</h3></div>
+      <button id="closeDetail" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="detailFacts" class="detail-facts"></div>
+    <div id="detailOwnerRow" class="owner-edit admin-only">
+      <label><span>归属用户</span><select id="detailOwner"></select></label>
+      <button id="saveOwner" class="secondary" type="button">保存归属</button>
+    </div>
+    <div class="dialog-actions">
+      <button id="editDetailNote" class="secondary" type="button">编辑备注</button>
+      <button id="editDetailPrice" class="secondary admin-only" type="button">修改价格</button>
+      <button id="refundDetailAccount" class="secondary hidden" type="button"></button>
+      <button id="deleteDetailAccount" class="danger hidden" type="button">删除账号</button>
+    </div>
+    <h4 class="cost-visible">用量窗口</h4>
+    <div id="detailUsageWindow" class="detail-usage-window cost-visible"></div>
+    <h4>模型用量</h4>
+    <div class="table-wrap detail-table"><table><thead><tr><th>请求模型</th><th>实际模型</th><th>请求数</th><th class="cost-visible">标准计费</th></tr></thead><tbody id="detailModels"></tbody></table></div>
+    <h4>每日用量</h4>
+    <div class="table-wrap detail-table"><table><thead><tr><th>日期</th><th>请求数</th><th class="cost-visible">标准计费</th></tr></thead><tbody id="detailDaily"></tbody></table></div>
+  </dialog>
+
+  <dialog id="reauthDialog" class="detail-dialog reauth-dialog">
+    <div class="dialog-head">
+      <div><span id="reauthStatus" class="status-badge status-temporary">待开始</span><h3 id="reauthTitle">重新授权</h3></div>
+      <button id="closeReauthDialog" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="reauthAccountFacts" class="detail-facts reauth-account-facts"></div>
+    <form id="reauthForm" class="reauth-form">
+      <div>
+        <span class="field-label">授权方式</span>
+        <div id="reauthMode" class="auth-mode-tabs" role="group" aria-label="授权方式">
+          <button class="secondary active" data-reauth-mode="login" type="button">OAuth 账号登录</button>
+          <button class="secondary" data-reauth-mode="setup_token" type="button">Setup Token</button>
+          <button class="secondary" data-reauth-mode="session_key" type="button">Session Key (旧版)</button>
+        </div>
+      </div>
+      <label id="reauthLoginMethodWrap">
+        <span>登录账号类型</span>
+        <select id="reauthLoginMethod">
+          <option value="claudeai">订阅号</option>
+          <option value="console">Claude Console</option>
+          <option value="sso">企业 SSO</option>
+        </select>
+      </label>
+      <label id="reauthInitialSessionKeyWrap" class="hidden">
+        <span>Session Key</span>
+        <input id="reauthInitialSessionKey" type="password" maxlength="16384" autocomplete="off" spellcheck="false" placeholder="sk-ant-sid...">
+      </label>
+      <label class="toggle-label reauth-restore-option">
+        <input id="reauthRestoreSchedulable" type="checkbox" checked>
+        <span>成功后恢复调度</span>
+      </label>
+      <button id="startReauthButton" class="primary" type="submit">生成授权链接</button>
+      <div id="reauthFormError" class="form-error" role="alert"></div>
+    </form>
+    <div id="activeReauth" class="reauth-session hidden" aria-live="polite">
+      <div class="job-head">
+        <strong id="reauthMessage">准备重新授权</strong>
+        <span id="reauthExpires">-</span>
+      </div>
+      <div id="reauthLinkRow" class="browser-auth-link-row hidden">
+        <label>
+          <span>授权链接</span>
+          <input id="reauthUrl" type="url" readonly spellcheck="false" aria-label="授权链接">
+        </label>
+        <button id="copyReauthUrl" class="secondary" type="button">复制</button>
+        <button id="openReauthUrl" class="primary" type="button">打开</button>
+      </div>
+      <div id="reauthCodeRow" class="browser-auth-actions hidden">
+        <label>
+          <span>授权码</span>
+          <input id="reauthCode" type="text" maxlength="8192" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="submitReauthCode" class="primary" type="button">提交授权码</button>
+        <button id="cancelReauth" class="secondary" type="button">取消任务</button>
+      </div>
+      <div id="reauthSessionKeyRow" class="browser-auth-actions hidden">
+        <label>
+          <span>Session Key</span>
+          <input id="reauthSessionKey" type="password" maxlength="16384" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="submitReauthSessionKey" class="primary" type="button">提交 SK</button>
+        <button id="cancelReauthSecret" class="secondary" type="button">取消任务</button>
+      </div>
+      <div id="reauthSetupTokenRow" class="browser-auth-actions hidden">
+        <label>
+          <span>Setup Token</span>
+          <input id="reauthSetupToken" type="password" maxlength="16384" autocomplete="off" spellcheck="false" placeholder="sk-ant-oat...">
+        </label>
+        <button id="submitReauthSetupToken" class="primary" type="button">提交 Setup Token</button>
+        <button id="cancelReauthSetupToken" class="secondary" type="button">取消任务</button>
+      </div>
+      <div id="reauthSessionActions" class="dialog-actions">
+        <button id="recoverReauth" class="primary hidden" type="button">重试恢复</button>
+        <button id="cancelReauthFallback" class="secondary hidden" type="button">取消任务</button>
+      </div>
+      <div id="reauthSessionError" class="form-error" role="alert"></div>
+    </div>
+  </dialog>
+
+  <dialog id="bulkReauthDialog" class="detail-dialog reauth-dialog bulk-reauth-dialog">
+    <div class="dialog-head">
+      <div><span id="bulkReauthStatus" class="status-badge status-temporary">待开始</span><h3>批量重新授权</h3></div>
+      <button id="closeBulkReauthDialog" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="bulk-reauth-shell">
+      <form id="bulkReauthForm" class="reauth-form bulk-reauth-form">
+        <div class="bulk-reauth-settings">
+          <div>
+            <span class="field-label">授权方式</span>
+            <div id="bulkReauthMode" class="auth-mode-tabs" role="group" aria-label="批量重新授权方式">
+              <button class="secondary active" data-bulk-reauth-mode="session_key" type="button">Session Key (旧版)</button>
+              <button class="secondary" data-bulk-reauth-mode="login" type="button">OAuth 账号登录</button>
+              <button class="secondary" data-bulk-reauth-mode="setup_token" type="button">Setup Token</button>
+            </div>
+          </div>
+          <label id="bulkReauthLoginMethodWrap" class="hidden">
+            <span>登录账号类型</span>
+            <select id="bulkReauthLoginMethod">
+              <option value="claudeai">订阅号</option>
+              <option value="console">Claude Console</option>
+              <option value="sso">企业 SSO</option>
+            </select>
+          </label>
+          <label class="toggle-label reauth-restore-option">
+            <input id="bulkReauthRestoreSchedulable" type="checkbox" checked>
+            <span>成功后恢复调度</span>
+          </label>
+          <div id="bulkReauthHelp" class="form-help">只会授权已勾选的账号；下面每个账号必须填写一个 sk-ant-sid。</div>
+          <label id="bulkReauthPasteWrap">
+            <span>批量粘贴 SK（可选，一行一个，按上方顺序填入）</span>
+            <textarea id="bulkReauthPaste" rows="5" maxlength="400000" spellcheck="false" placeholder="sk-ant-sid...&#10;sk-ant-sid..."></textarea>
+          </label>
+          <div class="form-actions">
+            <span id="bulkReauthRecognized">已选 0 个 · 已填 0 个</span>
+            <button id="startBulkReauthButton" class="primary" type="submit" disabled>开始批量重新授权</button>
+          </div>
+          <div id="bulkReauthError" class="form-error" role="alert"></div>
+        </div>
+        <div class="bulk-reauth-selection">
+          <div class="panel-head">
+            <strong>已勾选账号</strong>
+            <small>只会处理当前勾选的账号</small>
+          </div>
+          <div id="bulkReauthSelectedAccounts" class="batch-auth-list"></div>
+        </div>
+      </form>
+      <div id="activeBulkReauth" class="reauth-session hidden" aria-live="polite">
+        <div class="job-head batch-auth-head">
+          <div>
+            <span id="bulkReauthJobStatus" class="status-badge status-temporary">进行中</span>
+            <strong id="bulkReauthMessage">正在准备批量重新授权</strong>
+          </div>
+          <span id="bulkReauthNumbers">0 / 0</span>
+        </div>
+        <div id="bulkReauthItems" class="batch-auth-list"></div>
+        <div id="bulkReauthSessionError" class="form-error" role="alert"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="priceDialog" class="detail-dialog price-dialog">
+    <div class="dialog-head">
+      <div><h3 id="priceDialogTitle">修改账号价格</h3></div>
+      <button id="closePriceDialog" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="priceEditor" class="price-editor">
+      <label>
+        <span>账号 ID / 邮箱</span>
+        <textarea id="priceTargets" rows="5" placeholder="12345&#10;user@example.com----500"></textarea>
+      </label>
+      <div>
+        <span class="field-label">计价方式</span>
+        <div id="priceMode" class="price-mode" role="group" aria-label="计价方式">
+          <button class="segment active" data-price-mode="dynamic" type="button">动态计价</button>
+          <button class="segment" data-price-mode="fixed" type="button">固定价格</button>
+        </div>
+      </div>
+      <label id="fixedPriceWrap" class="hidden">
+        <span>统一固定价格</span>
+        <input id="fixedPrice" type="number" min="0" max="1000000" step="0.01" inputmode="decimal">
+      </label>
+      <label>
+        <span>修改原因</span>
+        <input id="priceReason" type="text" maxlength="300">
+      </label>
+      <div id="priceFormError" class="form-error"></div>
+      <div id="pricePreview" class="price-preview hidden" aria-live="polite">
+        <div class="price-preview-metrics">
+          <div><span>匹配账号</span><strong id="pricePreviewMatched">0</strong></div>
+          <div><span>修改前</span><strong id="pricePreviewOld">0.00</strong></div>
+          <div><span>修改后</span><strong id="pricePreviewNew">0.00</strong></div>
+          <div><span>差额</span><strong id="pricePreviewDelta">0.00</strong></div>
+        </div>
+        <div class="table-wrap price-preview-table"><table><thead><tr><th>账号</th><th>修改前</th><th>修改后</th></tr></thead><tbody id="pricePreviewBody"></tbody></table></div>
+      </div>
+      <div class="dialog-actions price-actions">
+        <button id="previewPrice" class="secondary" type="button">预览</button>
+        <button id="applyPrice" class="primary" type="button" disabled>确认修改</button>
+      </div>
+    </div>
+    <div class="price-history-head">
+      <h4>最近改价记录</h4>
+      <input id="priceHistorySearch" type="search" placeholder="账号、原因、操作人">
+    </div>
+    <div class="table-wrap detail-table price-history-table"><table><thead><tr><th>时间</th><th>账号</th><th>修改前</th><th>修改后</th><th>操作人</th><th>原因</th></tr></thead><tbody id="priceHistoryBody"></tbody></table></div>
+  </dialog>
+
+  <dialog id="accountNoteDialog" class="detail-dialog account-note-dialog" aria-labelledby="accountNoteTitle">
+    <div class="dialog-head">
+      <div><h3 id="accountNoteTitle">编辑账号备注</h3><span id="accountNoteAccount" class="dialog-account-label">-</span></div>
+      <button id="closeAccountNote" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <form id="accountNoteForm" class="account-note-form">
+      <label>
+        <span>备注（仅 Team 服务保存）</span>
+        <textarea id="accountNoteInput" rows="7" maxlength="500" placeholder="填写这个账号的备注信息"></textarea>
+      </label>
+      <div id="accountNoteError" class="form-error" role="alert"></div>
+      <div class="dialog-actions note-actions">
+        <button id="cancelAccountNote" class="secondary" type="button">取消</button>
+        <button id="saveAccountNote" class="primary" type="submit">保存备注</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="claudeSkLinkDialog" class="detail-dialog claude-sk-link-dialog">
+    <div class="dialog-head">
+      <div><h3>提交 Magic Link</h3></div>
+      <button id="closeClaudeSkLink" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <form id="claudeSkLinkForm" class="claude-sk-dialog-form">
+      <div id="claudeSkLinkEmail" class="dialog-account-label">-</div>
+      <label>
+        <span>Magic Link</span>
+        <textarea id="claudeSkMagicLink" rows="5" maxlength="8192" spellcheck="false" required></textarea>
+      </label>
+      <div id="claudeSkLinkError" class="form-error" role="alert"></div>
+      <div class="dialog-actions">
+        <button id="cancelClaudeSkLink" class="secondary" type="button">取消</button>
+        <button id="submitClaudeSkLink" class="primary" type="submit">提交验证</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="claudeSkMailDialog" class="detail-dialog claude-sk-mail-dialog">
+    <div class="dialog-head">
+      <div><h3>最近邮件</h3><span id="claudeSkMailEmail" class="dialog-account-label">-</span></div>
+      <button id="closeClaudeSkMail" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="claude-sk-mail-body">
+      <p id="claudeSkMailNote" class="claude-sk-mail-note">检测完成后可展开查看最近邮件正文。</p>
+      <div id="claudeSkMailList" class="claude-sk-mail-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="claudeSkBrowserDialog" class="detail-dialog claude-sk-browser-dialog">
+    <div class="dialog-head">
+      <div><h3>Claude 浏览器验证</h3></div>
+      <button id="closeClaudeSkBrowser" class="icon-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="claude-sk-browser-body">
+      <div class="claude-sk-browser-meta">
+        <strong id="claudeSkBrowserEmail">-</strong>
+        <span id="claudeSkBrowserStatus">正在读取浏览器</span>
+        <button id="refreshClaudeSkBrowser" class="secondary compact" type="button">刷新</button>
+      </div>
+      <div class="claude-sk-browser-frame">
+        <img id="claudeSkBrowserImage" alt="Claude 验证浏览器" draggable="false">
+      </div>
+      <div class="claude-sk-browser-keys" role="group" aria-label="浏览器按键">
+        <button type="button" data-claude-sk-key="Tab">Tab</button>
+        <button type="button" data-claude-sk-key="Enter">Enter</button>
+        <button type="button" data-claude-sk-key="Space">Space</button>
+        <button type="button" data-claude-sk-key="ArrowLeft">←</button>
+        <button type="button" data-claude-sk-key="ArrowUp">↑</button>
+        <button type="button" data-claude-sk-key="ArrowDown">↓</button>
+        <button type="button" data-claude-sk-key="ArrowRight">→</button>
+      </div>
+      <div id="claudeSkBrowserError" class="form-error" role="alert"></div>
+    </div>
+  </dialog>
+
+  <dialog id="proxySwapDialog" class="detail-dialog proxy-swap-dialog" aria-labelledby="proxySwapTitle">
+    <div class="dialog-head"><div><h3 id="proxySwapTitle">更换代理</h3><span id="proxySwapAccount" class="dialog-account-label"></span></div>
+      <button id="proxySwapClose" class="secondary icon-button" type="button" aria-label="关闭更换代理" title="关闭">×</button>
+    </div>
+    <dl class="proxy-swap-facts">
+      <dt>容器</dt><dd id="proxySwapContainer">-</dd>
+      <dt>原代理</dt><dd id="proxySwapOld">-</dd>
+      <dt>新代理</dt><dd id="proxySwapNew">待选择</dd>
+      <dt>实际出口</dt><dd id="proxySwapExit">待验证</dd>
+    </dl>
+    <p id="proxySwapStatus" role="status" aria-live="polite"></p>
+    <p id="proxySwapWarning" class="muted"></p>
+    <div id="proxySwapError" class="form-error" role="alert"></div>
+    <div class="dialog-actions"><button id="proxySwapSubmit" class="primary" type="button" disabled>确认更换</button></div>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <div class="confirm-copy">
+      <h3 id="confirmTitle">确认操作</h3>
+      <p id="confirmMessage"></p>
+    </div>
+    <div class="confirm-actions">
+      <button id="confirmCancel" class="secondary" type="button">取消</button>
+      <button id="confirmAccept" class="primary" type="button">确认</button>
+    </div>
+  </dialog>
+
+  <dialog id="errorStatsDialog" class="detail-dialog error-stats-dialog" aria-labelledby="errorStatsDialogTitle">
+    <div class="dialog-head"><h3 id="errorStatsDialogTitle">账号记录</h3><button id="errorStatsClose" class="icon-button" type="button" aria-label="关闭账号记录" title="关闭">×</button></div>
+    <div id="errorStatsHistory" aria-live="polite"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="./app.js?v=20261009-subscription-login" defer></script>
+</body>
+</html>
