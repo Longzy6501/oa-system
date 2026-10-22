@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: oa-system
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python server.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.1"
+      - key: OA_HOST
+        value: "0.0.0.0"
